@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="so">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#00c96e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="SuuqList">
+<meta name="application-name" content="SuuqList">
+<link rel="manifest" id="manifestLink">
+<title>SuuqList</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+<style>
+  :root {
+    --bg: #f7f8fa; --white: #ffffff; --border: #e8eaf0;
+    --green: #00c96e; --green-light: #e6faf2;
+    --red: #ff4d6d; --red-light: #fff0f3;
+    --text: #1a1d2e; --muted: #9096a8;
+    --shadow: 0 2px 16px #0000000d; --shadow-lg: 0 8px 40px #00000014;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Sora', sans-serif;
+    min-height: 100vh; max-width: 430px; margin: 0 auto;
+  }
+
+  .topbar {
+    background: var(--white); border-bottom: 1px solid var(--border);
+    padding: 0 20px; height: 60px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow);
+  }
+  .app-logo { display: flex; align-items: center; gap: 8px; }
+  .logo-icon {
+    width: 34px; height: 34px; background: var(--green);
+    border-radius: 10px; display: flex; align-items: center;
+    justify-content: center; font-size: 1.1rem;
+  }
+  .app-name { font-size: 1.1rem; font-weight: 800; letter-spacing: -0.5px; }
+  .app-name span { color: var(--green); }
+  .py-badge {
+    font-size: 0.65rem; font-family: 'Space Mono', monospace;
+    background: var(--green-light); color: var(--green);
+    border: 1px solid var(--green); border-radius: 20px; padding: 2px 8px;
+  }
+
+  /* INSTALL BANNER */
+  .install-banner {
+    background: linear-gradient(135deg, #00c96e, #00a85a);
+    color: white; padding: 12px 16px;
+    display: none; align-items: center; gap: 10px;
+    cursor: pointer; border-bottom: 1px solid #00a85a;
+  }
+  .install-banner.show { display: flex; }
+  .install-banner-icon { font-size: 1.4rem; flex-shrink: 0; }
+  .install-banner-text { flex: 1; }
+  .install-banner-text strong { display: block; font-size: 0.88rem; font-weight: 700; }
+  .install-banner-text span { font-size: 0.75rem; opacity: 0.85; }
+  .install-banner-btn {
+    background: white; color: var(--green);
+    border: none; border-radius: 8px;
+    padding: 7px 14px; font-weight: 700;
+    font-family: 'Sora', sans-serif; font-size: 0.78rem;
+    cursor: pointer; white-space: nowrap;
+  }
+  .install-banner-close {
+    background: none; border: none; color: white;
+    font-size: 1.1rem; cursor: pointer; padding: 4px; opacity: 0.8;
+  }
+
+  /* LOADING OVERLAY */
+  .overlay {
+    position: fixed; inset: 0; background: var(--white);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 999; transition: opacity 0.4s;
+  }
+  .overlay.hide { opacity: 0; pointer-events: none; }
+  .overlay-logo { font-size: 3rem; margin-bottom: 12px; animation: bounce 1s infinite; }
+  .overlay h2 { font-size: 1.4rem; font-weight: 800; margin-bottom: 6px; }
+  .overlay h2 span { color: var(--green); }
+  .overlay p { color: var(--muted); font-size: 0.82rem; font-family: 'Space Mono', monospace; margin-bottom: 24px; }
+  .progress-bar { width: 160px; height: 4px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--green); width: 0%; border-radius: 4px; animation: fillBar 3s ease forwards; }
+  @keyframes fillBar { to { width: 90%; } }
+  @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+
+  .content { padding: 20px 16px 100px; }
+
+  .shop-card, .add-card, .list-card {
+    background: var(--white); border-radius: 16px;
+    padding: 16px; margin-bottom: 16px;
+    box-shadow: var(--shadow); border: 1px solid var(--border);
+  }
+  .section-label {
+    font-size: 0.7rem; font-weight: 700; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;
+  }
+  .shop-input-row { display: flex; gap: 8px; }
+  .shop-input-row input, .add-row input {
+    flex: 1; border: 1.5px solid var(--border); border-radius: 10px;
+    padding: 11px 14px; font-family: 'Sora', sans-serif;
+    font-size: 0.88rem; outline: none; color: var(--text);
+    transition: border-color 0.2s; background: var(--bg);
+  }
+  .shop-input-row input:focus, .add-row input:focus { border-color: var(--green); background: var(--white); }
+  .shop-input-row input::placeholder, .add-row input::placeholder { color: var(--muted); }
+  .add-row input { font-size: 0.9rem; padding: 13px 14px; }
+  .add-row input:disabled { opacity: 0.5; cursor: not-allowed; }
+  .shop-confirm-btn {
+    background: var(--green); color: #fff; border: none; border-radius: 10px;
+    padding: 11px 16px; font-weight: 700; font-family: 'Sora', sans-serif;
+    font-size: 0.82rem; cursor: pointer; white-space: nowrap; transition: background 0.15s;
+  }
+  .shop-confirm-btn:hover { background: #00a85a; }
+  .shop-set-display {
+    display: none; align-items: center; justify-content: space-between;
+    background: var(--green-light); border: 1.5px solid var(--green);
+    border-radius: 10px; padding: 12px 14px;
+  }
+  .shop-set-display.show { display: flex; }
+  .shop-set-name { font-weight: 700; font-size: 0.9rem; color: var(--green); }
+  .edit-btn {
+    font-size: 0.75rem; font-weight: 600; background: none;
+    border: 1px solid var(--green); color: var(--green);
+    border-radius: 8px; padding: 4px 10px; cursor: pointer;
+    font-family: 'Sora', sans-serif; transition: all 0.15s;
+  }
+  .edit-btn:hover { background: var(--green); color: white; }
+
+  .add-row { display: flex; gap: 8px; }
+  .add-btn {
+    background: var(--green); color: #fff; border: none; border-radius: 10px;
+    width: 48px; height: 48px; font-size: 1.5rem; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s; flex-shrink: 0;
+  }
+  .add-btn:hover { background: #00a85a; }
+  .add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .list-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .count-pill { background: var(--green); color: #fff; font-size: 0.7rem; font-weight: 800; border-radius: 20px; padding: 3px 12px; font-family: 'Space Mono', monospace; }
+  .empty-state { text-align: center; padding: 28px 0; color: var(--muted); }
+  .empty-state .empty-icon { font-size: 2.5rem; margin-bottom: 8px; }
+  .empty-state p { font-size: 0.85rem; }
+
+  .list-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 0; border-bottom: 1px solid var(--border);
+    animation: slideIn 0.2s ease both;
+  }
+  .list-item:last-child { border-bottom: none; }
+  .item-num {
+    width: 26px; height: 26px; background: var(--green-light); color: var(--green);
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-size: 0.72rem; font-weight: 800; font-family: 'Space Mono', monospace; flex-shrink: 0;
+  }
+  .item-name { flex: 1; font-size: 0.9rem; font-weight: 600; }
+  .remove-btn {
+    width: 32px; height: 32px; background: var(--red-light); color: var(--red);
+    border: none; border-radius: 8px; font-size: 1rem; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s; flex-shrink: 0;
+  }
+  .remove-btn:hover { background: var(--red); color: white; }
+
+  .bottom-bar {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 100%; max-width: 430px; background: var(--white);
+    border-top: 1px solid var(--border); padding: 12px 16px;
+    display: flex; gap: 10px; box-shadow: 0 -4px 20px #0000000a;
+  }
+  .clear-btn {
+    flex: 1; padding: 14px; border: 1.5px solid var(--border);
+    border-radius: 12px; background: var(--white); color: var(--muted);
+    font-family: 'Sora', sans-serif; font-size: 0.85rem; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .clear-btn:hover { border-color: var(--red); color: var(--red); background: var(--red-light); }
+  .clear-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .done-btn {
+    flex: 2; padding: 14px; background: var(--green); color: white;
+    border: none; border-radius: 12px; font-family: 'Sora', sans-serif;
+    font-size: 0.92rem; font-weight: 700; cursor: pointer; transition: background 0.15s;
+  }
+  .done-btn:hover { background: #00a85a; }
+  .done-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .done-screen {
+    display: none; min-height: 100vh; flex-direction: column;
+    align-items: center; justify-content: center; padding: 32px 20px;
+    text-align: center; animation: fadeIn 0.4s ease both;
+  }
+  .done-screen.show { display: flex; }
+  .done-check {
+    width: 80px; height: 80px; background: var(--green-light);
+    border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; font-size: 2.2rem; margin-bottom: 20px;
+    border: 3px solid var(--green);
+  }
+  .done-screen h2 { font-size: 1.5rem; font-weight: 800; margin-bottom: 4px; }
+  .done-shop { color: var(--green); font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+  .done-sub { color: var(--muted); font-size: 0.82rem; margin-bottom: 24px; font-family: 'Space Mono', monospace; }
+  .done-list-card {
+    width: 100%; background: var(--white); border: 1px solid var(--border);
+    border-radius: 16px; padding: 16px; margin-bottom: 20px;
+    box-shadow: var(--shadow); text-align: left;
+  }
+  .done-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 0.88rem;
+  }
+  .done-item:last-child { border-bottom: none; }
+  .done-item-check {
+    width: 22px; height: 22px; background: var(--green); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 0.7rem; flex-shrink: 0;
+  }
+  .new-list-btn {
+    width: 100%; padding: 15px; background: var(--green); color: white;
+    border: none; border-radius: 14px; font-family: 'Sora', sans-serif;
+    font-size: 0.95rem; font-weight: 700; cursor: pointer; transition: background 0.15s;
+  }
+  .new-list-btn:hover { background: #00a85a; }
+
+  @keyframes slideIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</head>
+<body>
+
+<div class="overlay" id="overlay">
+  <div class="overlay-logo">🛒</div>
+  <h2>Suuq<span>List</span></h2>
+  <p>Python waa la rarayo...</p>
+  <div class="progress-bar"><div class="progress-fill"></div></div>
+</div>
+
+<div class="topbar">
+  <div class="app-logo">
+    <div class="logo-icon">🛒</div>
+    <span class="app-name">Suuq<span>List</span></span>
+  </div>
+  <span class="py-badge">🐍 Python</span>
+</div>
+
+<!-- INSTALL BANNER -->
+<div class="install-banner" id="installBanner">
+  <div class="install-banner-icon">📲</div>
+  <div class="install-banner-text">
+    <strong>Ku rakib telefoonkaaga!</strong>
+    <span>Home screen ku kaydi si aad u isticmaasho</span>
+  </div>
+  <button class="install-banner-btn" id="installBtn">Rakib</button>
+  <button class="install-banner-close" onclick="closeBanner()">✕</button>
+</div>
+
+<div id="mainView">
+  <div class="content">
+    <div class="shop-card">
+      <div class="section-label">🏪 Magaca Dukaanka</div>
+      <div class="shop-input-row" id="shopInputRow">
+        <input type="text" id="shopInput" placeholder="Tusaale: Dukaanka Xasan..." />
+        <button class="shop-confirm-btn" onclick="setShop()">✓ Xaqiiji</button>
+      </div>
+      <div class="shop-set-display" id="shopDisplay">
+        <span>🏪 <span class="shop-set-name" id="shopNameText"></span></span>
+        <button class="edit-btn" onclick="editShop()">✏ Beddel</button>
+      </div>
+    </div>
+
+    <div class="add-card">
+      <div class="section-label">➕ Ku Dar Alaab</div>
+      <div class="add-row">
+        <input type="text" id="itemInput" placeholder="Magaca alaabta..." disabled />
+        <button class="add-btn" id="addBtn" onclick="pyAdd()" disabled>+</button>
+      </div>
+    </div>
+
+    <div class="list-card">
+      <div class="list-header-row">
+        <div class="section-label" style="margin:0">📋 Liiska Alaabta</div>
+        <span class="count-pill" id="countPill">0 alaab</span>
+      </div>
+      <div id="listDisplay">
+        <div class="empty-state">
+          <div class="empty-icon">📭</div>
+          <p>Liiska waa madhan yahay<br>Ku dar alaabta aad rabto</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-bar">
+    <button class="clear-btn" id="clearBtn" onclick="pyClear()" disabled>🗑 Nadiifi</button>
+    <button class="done-btn" id="doneBtn" onclick="pyDone()" disabled>✓ Dhamee Liiska</button>
+  </div>
+</div>
+
+<div class="done-screen" id="doneScreen">
+  <div class="done-check">✅</div>
+  <h2>Liiska Dhammaatay!</h2>
+  <div class="done-shop" id="doneShop"></div>
+  <div class="done-sub" id="doneSub"></div>
+  <div class="done-list-card" id="doneListCard"></div>
+  <button class="new-list-btn" onclick="pyRestart()">🔄 Liis Cusub Bilow</button>
+</div>
+
+<script>
+let pyodide = null;
+let shopName = '';
+let deferredPrompt = null;
+
+// ── PWA MANIFEST (inline, no server needed) ──────────────────────
+const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="100" fill="#00c96e"/>
+  <text x="256" y="340" font-size="260" text-anchor="middle" fill="white">🛒</text>
+</svg>`;
+const iconBlob = new Blob([iconSvg], {type:'image/svg+xml'});
+const iconUrl  = URL.createObjectURL(iconBlob);
+
+const manifest = {
+  name: "SuuqList",
+  short_name: "SuuqList",
+  description: "Liiska Alaabta Dukaanka",
+  start_url: ".",
+  display: "standalone",
+  background_color: "#f7f8fa",
+  theme_color: "#00c96e",
+  icons: [
+    { src: iconUrl, sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" }
+  ]
+};
+const manifestBlob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+const manifestUrl  = URL.createObjectURL(manifestBlob);
+document.getElementById('manifestLink').href = manifestUrl;
+
+// ── SERVICE WORKER (inline) ───────────────────────────────────────
+const swCode = `
+self.addEventListener('install', e => self.skipWaiting());
+self.addEventListener('activate', e => clients.claim());
+self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => new Response(''))));
+`;
+if ('serviceWorker' in navigator) {
+  const swBlob = new Blob([swCode], {type:'application/javascript'});
+  const swUrl  = URL.createObjectURL(swBlob);
+  navigator.serviceWorker.register(swUrl).catch(() => {});
+}
+
+// ── INSTALL PROMPT ────────────────────────────────────────────────
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installBanner').classList.add('show');
+});
+
+document.getElementById('installBtn').addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const result = await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  document.getElementById('installBanner').classList.remove('show');
+});
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('installBanner').classList.remove('show');
+});
+
+function closeBanner() {
+  document.getElementById('installBanner').classList.remove('show');
+}
+
+// ── PYTHON ────────────────────────────────────────────────────────
+async function init() {
+  pyodide = await loadPyodide();
+  pyodide.runPython(`
+alaabta = []
+magaca_dukaanka = ""
+
+def set_dukaanka(magac):
+    global magaca_dukaanka
+    magaca_dukaanka = magac.strip()
+
+def ku_dar(shay):
+    shay = shay.strip()
+    if not shay:
+        return False
+    alaabta.append(shay)
+    return True
+
+def ka_saar(i):
+    if 0 <= i < len(alaabta):
+        alaabta.pop(i)
+        return True
+    return False
+
+def nadiifi():
+    alaabta.clear()
+
+def hel_liiska():
+    return list(alaabta)
+
+def hel_dukaanka():
+    return magaca_dukaanka
+  `);
+
+  document.getElementById('overlay').classList.add('hide');
+  ['itemInput','addBtn','clearBtn','doneBtn'].forEach(id => {
+    document.getElementById(id).disabled = false;
+  });
+  document.getElementById('itemInput').addEventListener('keydown', e => { if (e.key==='Enter') pyAdd(); });
+  document.getElementById('shopInput').addEventListener('keydown', e => { if (e.key==='Enter') setShop(); });
+  renderList();
+}
+
+function setShop() {
+  const val = document.getElementById('shopInput').value.trim();
+  if (!val) return;
+  shopName = val;
+  pyodide.runPython(`set_dukaanka(${JSON.stringify(val)})`);
+  document.getElementById('shopNameText').textContent = val;
+  document.getElementById('shopInputRow').style.display = 'none';
+  document.getElementById('shopDisplay').classList.add('show');
+}
+
+function editShop() {
+  document.getElementById('shopDisplay').classList.remove('show');
+  document.getElementById('shopInputRow').style.display = 'flex';
+  document.getElementById('shopInput').value = shopName;
+  setTimeout(() => document.getElementById('shopInput').focus(), 50);
+}
+
+function renderList() {
+  const items = pyodide.runPython(`hel_liiska()`).toJs();
+  const display = document.getElementById('listDisplay');
+  document.getElementById('countPill').textContent = items.length + ' alaab';
+  if (items.length === 0) {
+    display.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p>Liiska waa madhan yahay<br>Ku dar alaabta aad rabto</p></div>`;
+    return;
+  }
+  display.innerHTML = items.map((shay, i) => `
+    <div class="list-item">
+      <div class="item-num">${i+1}</div>
+      <span class="item-name">${shay}</span>
+      <button class="remove-btn" onclick="pyRemove(${i})">✕</button>
+    </div>`).join('');
+}
+
+function pyAdd() {
+  const input = document.getElementById('itemInput');
+  const shay = input.value.trim();
+  if (!shay) return;
+  pyodide.runPython(`ku_dar(${JSON.stringify(shay)})`);
+  input.value = ''; input.focus();
+  renderList();
+}
+
+function pyRemove(i) {
+  pyodide.runPython(`ka_saar(${i})`);
+  renderList();
+}
+
+function pyClear() {
+  if (!confirm('Ma hubtaa inaad nadiifin rabto dhammaan liiska?')) return;
+  pyodide.runPython(`nadiifi()`);
+  renderList();
+}
+
+function pyDone() {
+  const items = pyodide.runPython(`hel_liiska()`).toJs();
+  if (items.length === 0) { alert('⚠ Ku dar alaab marka hore!'); return; }
+  const dukaan = pyodide.runPython(`hel_dukaanka()`);
+  document.getElementById('mainView').style.display = 'none';
+  document.getElementById('doneScreen').classList.add('show');
+  document.getElementById('doneShop').textContent = dukaan ? '🏪 ' + dukaan : '';
+  document.getElementById('doneSub').textContent = items.length + ' alaab ayaad liistay — guul! 🎉';
+  document.getElementById('doneListCard').innerHTML = items.map(shay =>
+    `<div class="done-item"><div class="done-item-check">✓</div><span>${shay}</span></div>`
+  ).join('');
+}
+
+function pyRestart() {
+  pyodide.runPython(`nadiifi()`);
+  shopName = '';
+  document.getElementById('shopInput').value = '';
+  document.getElementById('shopDisplay').classList.remove('show');
+  document.getElementById('shopInputRow').style.display = 'flex';
+  document.getElementById('doneScreen').classList.remove('show');
+  document.getElementById('mainView').style.display = 'block';
+  renderList();
+}
+
+init();
+</script>
+</body>
+</html>
